@@ -1,25 +1,36 @@
 from fastapi import FastAPI
 import requests
+from dotenv import load_dotenv
 import os
-import json
+
+# Load .env file
+load_dotenv()
 
 app = FastAPI()
 
-DATA_DIR = "../data"
-API_KEY = "YOUR_OPENWEATHERMAP_API_KEY"  # Replace with your API key
+API_KEY = os.getenv("API_KEY")
+BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
 
-if not os.path.exists(DATA_DIR):
-    os.makedirs(DATA_DIR)
+@app.get("/")
+def home():
+    return {"message": "Weather Data Analyzer is running!"}
 
-@app.get("/fetch_weather")
+@app.get("/fetch_weather/{city}")
 def fetch_weather(city: str):
-    url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={API_KEY}&units=metric"
-    response = requests.get(url)
-    data = response.json()
-    
-    # Save JSON file
-    file_path = os.path.join(DATA_DIR, f"{city}.json")
-    with open(file_path, "w") as f:
-        json.dump(data, f, indent=4)
-    
-    return {"message": f"Weather data for {city} saved successfully!"}
+    try:
+        url = f"{BASE_URL}?q={city}&appid={API_KEY}&units=metric"
+        response = requests.get(url)
+        data = response.json()
+
+        if response.status_code == 200:
+            return {
+                "city": data["name"],
+                "temperature": data["main"]["temp"],
+                "weather": data["weather"][0]["description"],
+                "humidity": data["main"]["humidity"],
+                "wind_speed": data["wind"]["speed"]
+            }
+        else:
+            return {"error": data.get("message", "Unable to fetch weather data")}
+    except Exception as e:
+        return {"error": str(e)}
