@@ -1,36 +1,41 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 import requests
-from dotenv import load_dotenv
 import os
+from dotenv import load_dotenv
 
-# Load .env file
+# Load environment variables
 load_dotenv()
+API_KEY = os.getenv("WEATHER_API_KEY")
 
-app = FastAPI()
+app = FastAPI(title="Weather Data Analyzer", version="1.0")
 
-API_KEY = os.getenv("API_KEY")
-BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
-
+# Root route
 @app.get("/")
-def home():
-    return {"message": "Weather Data Analyzer is running!"}
+def read_root():
+    return {"message": "🌦️ Welcome to Weather Data Analyzer API!"}
 
-@app.get("/fetch_weather/{city}")
-def fetch_weather(city: str):
-    try:
-        url = f"{BASE_URL}?q={city}&appid={API_KEY}&units=metric"
-        response = requests.get(url)
-        data = response.json()
+# Weather route
+@app.get("/weather/{city}")
+def get_weather(city: str):
+    if not API_KEY:
+        raise HTTPException(status_code=500, detail="API key not found. Please set WEATHER_API_KEY in .env")
 
-        if response.status_code == 200:
-            return {
-                "city": data["name"],
-                "temperature": data["main"]["temp"],
-                "weather": data["weather"][0]["description"],
-                "humidity": data["main"]["humidity"],
-                "wind_speed": data["wind"]["speed"]
-            }
-        else:
-            return {"error": data.get("message", "Unable to fetch weather data")}
-    except Exception as e:
-        return {"error": str(e)}
+    url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={API_KEY}&units=metric"
+
+    response = requests.get(url)
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code, detail="City not found or API request failed")
+
+    data = response.json()
+
+    # Extract useful info
+    result = {
+        "city": data["name"],
+        "temperature": f"{data['main']['temp']} °C",
+        "feels_like": f"{data['main']['feels_like']} °C",
+        "weather": data["weather"][0]["description"].capitalize(),
+        "humidity": f"{data['main']['humidity']}%",
+        "wind_speed": f"{data['wind']['speed']} m/s"
+    }
+
+    return result
