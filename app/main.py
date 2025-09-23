@@ -1,41 +1,35 @@
-from fastapi import FastAPI, HTTPException
-import requests
-import os
-from dotenv import load_dotenv
+from fastapi import FastAPI
+from app.services.weather_service import get_weather
 
-# Load environment variables
-load_dotenv()
-API_KEY = os.getenv("WEATHER_API_KEY")
+# Initialize FastAPI app
+app = FastAPI(
+    title="Weather Data Analyzer",
+    description="A simple API to fetch real-time weather data using OpenWeatherMap",
+    version="1.0.0"
+)
 
-app = FastAPI(title="Weather Data Analyzer", version="1.0")
-
-# Root route
 @app.get("/")
-def read_root():
-    return {"message": "🌦️ Welcome to Weather Data Analyzer API!"}
+def home():
+    return {"message": "Weather Data Analyzer API is running!"}
 
-# Weather route
 @app.get("/weather/{city}")
-def get_weather(city: str):
-    if not API_KEY:
-        raise HTTPException(status_code=500, detail="API key not found. Please set WEATHER_API_KEY in .env")
+def fetch_weather(city: str):
+    """
+    Fetch real-time weather data for a given city
+    """
+    data = get_weather(city)
 
-    url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={API_KEY}&units=metric"
+    # If error occurred in API
+    if "error" in data:
+        return data
 
-    response = requests.get(url)
-    if response.status_code != 200:
-        raise HTTPException(status_code=response.status_code, detail="City not found or API request failed")
-
-    data = response.json()
-
-    # Extract useful info
-    result = {
-        "city": data["name"],
-        "temperature": f"{data['main']['temp']} °C",
-        "feels_like": f"{data['main']['feels_like']} °C",
-        "weather": data["weather"][0]["description"].capitalize(),
-        "humidity": f"{data['main']['humidity']}%",
-        "wind_speed": f"{data['wind']['speed']} m/s"
+    # Clean structured response (corporate-level look 😎)
+    response = {
+        "city": data.get("name"),
+        "country": data.get("sys", {}).get("country"),
+        "temperature": f"{data.get('main', {}).get('temp')} °C",
+        "humidity": f"{data.get('main', {}).get('humidity')}%",
+        "weather": data.get("weather", [{}])[0].get("description"),
+        "wind_speed": f"{data.get('wind', {}).get('speed')} m/s"
     }
-
-    return result
+    return response
