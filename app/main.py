@@ -1,35 +1,24 @@
 from fastapi import FastAPI
 from app.services.weather_service import get_weather
+from app.history import save_weather, get_history
 
-# Initialize FastAPI app
-app = FastAPI(
-    title="Weather Data Analyzer",
-    description="A simple API to fetch real-time weather data using OpenWeatherMap",
-    version="1.0.0"
-)
+app = FastAPI()
 
-@app.get("/")
-def home():
-    return {"message": "Weather Data Analyzer API is running!"}
 
 @app.get("/weather/{city}")
-def fetch_weather(city: str):
-    """
-    Fetch real-time weather data for a given city
-    """
+def weather(city: str):
     data = get_weather(city)
-
-    # If error occurred in API
     if "error" in data:
-        return data
+        return {"error": data["error"]}
 
-    # Clean structured response (corporate-level look 😎)
-    response = {
-        "city": data.get("name"),
-        "country": data.get("sys", {}).get("country"),
-        "temperature": f"{data.get('main', {}).get('temp')} °C",
-        "humidity": f"{data.get('main', {}).get('humidity')}%",
-        "weather": data.get("weather", [{}])[0].get("description"),
-        "wind_speed": f"{data.get('wind', {}).get('speed')} m/s"
-    }
-    return response
+    # Save fetched data to history
+    save_weather(city, data["temperature"], data["condition"])
+    return data
+
+
+@app.get("/history/{city}")
+def history(city: str):
+    records = get_history(city)
+    if not records:
+        return {"message": f"No history found for {city}"}
+    return {"history": records}
