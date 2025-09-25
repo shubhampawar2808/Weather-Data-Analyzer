@@ -1,24 +1,26 @@
 from fastapi import FastAPI
 from app.services.weather_service import get_weather
-from app.history import save_weather, get_history
+from app.history import save_weather
+from app.database import SessionLocal
+from app.models import WeatherHistory
 
 app = FastAPI()
 
 
 @app.get("/weather/{city}")
-def weather(city: str):
+def read_weather(city: str):
+    """Fetch weather for a city and save it to DB"""
     data = get_weather(city)
-    if "error" in data:
-        return {"error": data["error"]}
-
-    # Save fetched data to history
-    save_weather(city, data["temperature"], data["condition"])
+    save_weather(data)  # DB मध्ये save
     return data
 
 
-@app.get("/history/{city}")
-def history(city: str):
-    records = get_history(city)
-    if not records:
-        return {"message": f"No history found for {city}"}
-    return {"history": records}
+@app.get("/history")
+def get_history():
+    """Get all saved weather history from DB"""
+    db = SessionLocal()
+    try:
+        records = db.query(WeatherHistory).all()
+        return records
+    finally:
+        db.close()
