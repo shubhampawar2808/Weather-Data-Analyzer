@@ -1,26 +1,25 @@
-from fastapi import FastAPI
+# app/main.py
+from fastapi import FastAPI, HTTPException
 from app.services.weather_service import get_weather
-from app.history import save_weather
-from app.database import SessionLocal
-from app.models import WeatherHistory
+from app.history import save_weather, get_history
 
-app = FastAPI()
+app = FastAPI(title="Weather Data Analyzer")
 
+@app.get("/")
+def root():
+    return {"message": "Weather Data Analyzer running!"}
 
 @app.get("/weather/{city}")
-def read_weather(city: str):
-    """Fetch weather for a city and save it to DB"""
+def weather_endpoint(city: str):
     data = get_weather(city)
-    save_weather(data)  # DB मध्ये save
-    return data
-
+    if "error" in data:
+        raise HTTPException(status_code=404, detail=data["error"])
+    saved = save_weather(data)
+    return {"fetched": data, "saved": saved}
 
 @app.get("/history")
-def get_history():
-    """Get all saved weather history from DB"""
-    db = SessionLocal()
-    try:
-        records = db.query(WeatherHistory).all()
-        return records
-    finally:
-        db.close()
+def history_endpoint(city: str = None, limit: int = 100):
+    records = get_history(city=city, limit=limit)
+    if not records:
+        return {"message": "No history found"}
+    return {"history": records}
